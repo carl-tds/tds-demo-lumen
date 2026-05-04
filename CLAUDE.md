@@ -21,16 +21,17 @@ If installed, Superpowers' skills auto-trigger alongside the TDS skills below �
 **Monday workspace:** https://tailoreddigitalsystems.monday.com/workspaces/6262640
 **Monday board (Lumen Dental tasks):** https://tailoreddigitalsystems.monday.com/boards/5095468302
 **Project brief (read second):** https://tailoreddigitalsystems.monday.com/docs/5095472250
+**Slack channel (this project):** `#tds-lumen` — orchestrator posts STARTED, DECISION NEEDED, QA PENDING, BLOCKED, ESCALATION here. See `.claude/skills/slack-protocol.md`.
 **Lessons learned:** see `LESSONS.md` — read the most recent 10 entries before starting
 
 > ⚠️ **Note on the brief vs this CLAUDE.md:** The Monday brief was written assuming Replit hosting. **This project actually runs on Vercel + Neon Postgres** — see the Stack section below. If the brief and this CLAUDE.md disagree, this CLAUDE.md wins.
 
 ## How the agent system works
 
-You — the human — talk only to the **Orchestrator**. The orchestrator reads the Monday task, decides which specialists to invoke, sequences their work, and posts the final Build Outcome on Monday.
+You — the human — talk only to the **Orchestrator**. The orchestrator reads the Monday task, decides which specialists to invoke, sequences their work, and posts the final Build Outcome on Monday. **In v3.1, the orchestrator runs autonomously and surfaces decisions via Slack** — see the next section.
 
 ```
-You
+You (mostly via Slack now, occasionally via chat)
  ↓
 Orchestrator (the only one you converse with)
  ↓
@@ -45,15 +46,34 @@ Specialists (called as needed):
 
 Seven skills total. Most code tasks invoke 3 specialists: a builder + Code Reviewer + QA. Spec-only tasks invoke 1: Spec Interpreter. Lumen Dental has no GHL component.
 
+## Slack-driven autonomy mode (v3.1 default)
+
+This bundle runs in **Slack-driven autonomy mode**. The orchestrator runs continuously without pausing the chat for routine progress. Status updates and decisions surface to Slack in `#tds-lumen`. The chat session stays largely silent during normal runs.
+
+**The six Slack message types you'll see** (full format in `.claude/skills/slack-protocol.md`):
+
+| Message | When | Reply needed? |
+|---|---|---|
+| `STARTED` | Orchestrator picks up a task | No (info — reply STOP to redirect) |
+| `DECISION NEEDED` | Spec is thin / scope ambiguous / Iron Law gap | **Yes** (A/B/C) |
+| `CODE REVIEW FAIL` | Code Review failed twice on same task | **Yes** (A/B/C) |
+| `QA PENDING` | Task complete, ready for human final review on Monday | No (review at your pace) |
+| `BLOCKED` | Real blocker hit (missing credentials, undocumented dep) | **Yes** (resolve or redirect) |
+| `ESCALATION` | Cross-task issue surfaced (data mismatch, stack inconsistency) | **Yes** (free-form) |
+
+**The park-and-pivot rule:** when a decision is pending in Slack, the orchestrator does NOT sit idle. It picks up the next unblocked task in **the same project** that's independent of the parked one. When you reply, the parked task resumes with your decision applied.
+
+**Three orchestrators in parallel:** to run multiple projects simultaneously, open one Claude Code session per project (one terminal window each). Each posts to its own `#tds-<project>` channel only — never cross-project. You watch three Slack channels, three projects move forward.
+
 ## The five behavioural gates
 
-The orchestrator enforces five gates on every session and every task. These are non-negotiable:
+The orchestrator enforces five gates on every session and every task. These are non-negotiable. **In v3.1, gates surface to Slack rather than pausing the chat** — see Slack-driven autonomy section above.
 
-1. **Session Planning Gate** — at the start of every session, orchestrator presents the next ~3 tasks and waits for human approval before dispatching anything
-2. **Spec Sufficiency Check** — if the Monday Build Requirements update is thin or ambiguous, dispatch Spec Interpreter first, never let a builder guess
-3. **TDD Trigger Check** — for code tasks, decide whether testable behaviour applies before dispatching the specialist (backend logic always; frontend forms with logic always; pure UI/styling no)
-4. **Code Reviewer Dispatch** — between builder completion and QA Reviewer, dispatch Code Reviewer (Haiku) for any task with code
-5. **Iron Law Verification Gate** — before posting Build Outcome to Monday, confirm fresh verification evidence is in the most recent specialist response
+1. **Session Planning Gate** — at session start, orchestrator picks the top-priority unblocked task autonomously and posts STARTED to Slack. Reply STOP within the next agent step to redirect.
+2. **Spec Sufficiency Check** — if the Monday Build Requirements update is thin or ambiguous, post DECISION NEEDED with options (stub / split / block). Never let a builder guess.
+3. **TDD Trigger Check** — for code tasks, decide whether testable behaviour applies before dispatching the specialist (backend logic always; frontend forms with logic always; pure UI/styling no). Autonomous unless genuinely ambiguous.
+4. **Code Reviewer Dispatch** — between builder completion and QA Reviewer, dispatch Code Reviewer (Haiku) for any task with code. First FAIL silently retries; second FAIL escalates to Slack.
+5. **Iron Law Verification Gate** — before posting Build Outcome to Monday, confirm fresh verification evidence is in the most recent specialist response. On gap: DECISION NEEDED.
 
 The Iron Law itself, applied throughout: *"If you haven't run the verification command in this message, you cannot claim it passes."*
 
@@ -70,25 +90,28 @@ The Iron Law itself, applied throughout: *"If you haven't run the verification c
 | Spec interpretation | `.claude/skills/spec-interpreter.md` |
 | Code review conventions | `.claude/skills/code-reviewer.md` |
 | QA conventions | `.claude/skills/qa-review.md` |
+| Slack protocol (message formats, park-and-pivot) | `.claude/skills/slack-protocol.md` |
 | Past lessons | `LESSONS.md` (top of file = most recent) |
 | Permissions for autonomous runs | `.claude/settings.json` |
 
 ## Workflow at a glance
 
-1. **You start a session** — say "let's pick up some tasks on the Lumen Dental board" or "work on item <id>"
-2. **Orchestrator runs Session Planning Gate** — reads the board, presents next ~3 tasks with reasoning, waits for your approval
-3. **You approve / adjust** — orchestrator proceeds with the approved order
-4. **For each task:**
-   - **Spec Sufficiency Check** — if Build Requirements thin, dispatch Spec Interpreter first
-   - **TDD Trigger Check** — for code tasks, decide whether tests are required
+1. **You start a session** — say "work on the Lumen Dental board" in this Claude Code session
+2. **Orchestrator picks up the top-priority unblocked task autonomously** — posts STARTED to `#tds-lumen`
+3. **For each task (autonomously, gates surface to Slack only when needed):**
+   - **Spec Sufficiency Check** — if Build Requirements thin, post DECISION NEEDED; park-and-pivot
+   - **TDD Trigger Check** — autonomous classification per task
    - **Dispatch builders in sequence** — Backend before Frontend
    - **Each specialist** plans, builds with self-checks, reports back with Iron Law evidence
-   - **Code Reviewer (Haiku)** runs for code tasks, before QA
-   - **QA Reviewer (Haiku)** independently verifies acceptance criteria
-   - **Iron Law Verification Gate** — orchestrator confirms evidence is present
+   - **Code Reviewer (Haiku)** runs for code tasks; first FAIL silently retries, second FAIL posts DECISION NEEDED
+   - **QA Reviewer (Haiku)** independently verifies acceptance criteria; same retry+escalate pattern
+   - **Iron Law Verification Gate** — orchestrator confirms evidence is present (or DECISION NEEDED if not)
    - **Build Outcome posted** to Monday with Lessons box on top
    - **Status moves to QA Pending** — never to Done; humans do final flip
-5. **LESSONS.md updated** — orchestrator records orchestration lessons; specialists record domain lessons
+   - **QA PENDING posted to Slack** — you review on Monday at your own pace
+4. **Orchestrator picks up the next task immediately** — does not wait for you to QA the previous one
+5. **You drive via Slack** — STOP to redirect, A/B/C to resolve decisions, free-form for escalations
+6. **LESSONS.md updated** — orchestrator records orchestration lessons; specialists record domain lessons
 
 ## Stack
 
@@ -99,8 +122,8 @@ The Iron Law itself, applied throughout: *"If you haven't run the verification c
 - **Email:** Postmark (transactional). Not yet integrated.
 - **SMS:** Twilio (reminders). Not yet integrated.
 - **Storage:** AWS S3 (patient documents). Not yet integrated.
-- **Hosting:** **Vercel** — auto-deploys from GitHub on every push
-- **Source of truth for code:** GitHub repo `carl-tds/tds-demo-lumen` (private)
+- **Hosting:** **Vercel** — auto-deploys from GitHub on every push (repo is currently public on Hobby tier; switch to private when on Pro)
+- **Source of truth for code:** GitHub repo `carl-tds/tds-demo-lumen`
 - **Test runner:** (to be added — Vitest is the default for this stack) — `npm test`
 - **Lint:** ESLint + Next.js defaults — `npm run lint`
 - **Build:** `npm run build`
@@ -127,9 +150,9 @@ The Iron Law itself, applied throughout: *"If you haven't run the verification c
 ## What's already in place (this is a fresh demo project)
 
 - ✅ Next.js scaffold, TypeScript, Tailwind v4, ESLint
-- ✅ Vercel deployment connected to GitHub `main` branch
+- ✅ Vercel deployment connected to GitHub `main` branch (Hobby tier — repo is public)
 - ✅ Neon Postgres database (empty)
-- ✅ `DATABASE_URL` configured in Vercel env vars
+- ✅ `DATABASE_URL` configured in Vercel env vars (Production + Preview)
 - ❌ Prisma not yet installed (first DB-touching task will install it)
 - ❌ Clerk auth not yet integrated
 - ❌ Postmark / Twilio / S3 not yet integrated
@@ -151,6 +174,7 @@ The Iron Law itself, applied throughout: *"If you haven't run the verification c
 - Never edit `package-lock.json` by hand
 - Never claim something works without running the verification in the same response (Iron Law)
 - Never deviate from the Stack section above without flagging it first
+- Never post to a Slack channel other than `#tds-lumen` from this orchestrator
 
 ## When you're stuck (orchestrator or specialist)
 
@@ -159,7 +183,7 @@ If you're not 95% confident about how to proceed:
 1. Re-read the relevant skill file
 2. Re-read the Monday Build Requirements update
 3. Check `LESSONS.md` for relevant past entries
-4. If still stuck: post on the Monday item asking the specific question, set status to Blocked, fill Blocker Notes
+4. If still stuck: post DECISION NEEDED or BLOCKED to `#tds-lumen` per `.claude/skills/slack-protocol.md`
 
 Don't guess. A Blocked task is fine. A wrong build is expensive.
 
@@ -169,4 +193,4 @@ Tag `@andrew` in a Monday item update if any of the above is unclear or out of d
 
 ---
 
-*Last updated: 2026-05-04. Demo project for the AI agent pilot. Keep this trim. Aim for under 200 lines total. Promote stable lessons from `LESSONS.md` into this file periodically; demote one-offs.*
+*Last updated: 2026-05-04. Demo project for the AI agent pilot. v3.1 (Slack-driven autonomy). Keep this trim. Aim for under 220 lines total. Promote stable lessons from `LESSONS.md` into this file periodically; demote one-offs.*

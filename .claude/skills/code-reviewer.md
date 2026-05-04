@@ -118,7 +118,11 @@ This is one of the most valuable things you do. Lessons are only useful if someo
 
 **If everything looks good:** PASS report. Orchestrator dispatches QA Reviewer next.
 
-**If you found issues:** FAIL report with specific findings. Builder picks it up again. Up to 2 iterations before orchestrator escalates.
+**If you found issues (1st FAIL):** FAIL report with specific findings. Orchestrator silently re-dispatches the builder with your findings — no Slack post yet. The retry is automatic.
+
+**If you found issues again (2nd FAIL on the retry):** FAIL report again, but now the orchestrator escalates to Slack as `CODE REVIEW FAIL` per `slack-protocol.md`. The human gets options A/B/C (third try with explicit guidance / split task / block). Don't dispatch a third time without their approval.
+
+The auto-retry-then-escalate pattern keeps Slack quiet for routine fixes (most FAILs are caught and corrected on the second pass) while ensuring genuine recurring issues escalate properly.
 
 **If you're not sure:** ASK report. Specifically ask the orchestrator one or two questions. Don't pad with maybes.
 
