@@ -14,6 +14,9 @@
 
 ## Recent lessons (newest first)
 
+[2026-05-06] LD01a (orchestrator): Slack-driven autonomy v3.1 has no auto-detection of Slack replies — when DECISION NEEDED is posted and the chat session ends, the orchestrator does not resume on its own. Either set up the `loop` skill to poll, or expect the human to nudge the chat session. Document this gap in CLAUDE.md once a polling mechanism is chosen.
+[2026-05-06] LD01a (orchestrator): Always run `git status` in the worktree before dispatching builders — a prior session left uncommitted Prisma schema + deps that would have been duplicated by a fresh dispatch. Builders should pick up partial state, not redo it.
+[2026-05-06] LD01a (orchestrator): Prisma 7 + Neon needs `@prisma/adapter-pg` + `pg` wired into `lib/db.ts` at runtime — the Prisma client constructor throws without an adapter. Recurring pattern; consider promoting to CLAUDE.md once we've shipped a second Prisma-touching task.
 [2026-05-06] LD01a: React 19's eslint rule `react-hooks/set-state-in-effect` flags ANY setState() inside an effect body, not just synchronous-before-await ones. Move pre-fetch UI flips ("loading") into the input/event handler that triggers the dependency change, leave the effect to consume the response only.
 [2026-05-06] LD01a: Vitest 4 + globals:false + @testing-library/react 16 does NOT auto-register cleanup() between tests — DOM nodes from previous render() calls stack and getByRole reports duplicates from the prior test. Register `afterEach(cleanup)` in the setupFiles entry explicitly.
 [2026-05-06] LD01a: Vitest 4 supports a `projects: [...]` array on the root `test:` config so the same repo can run node-environment tests (API routes) and jsdom-environment tests (React components) in one `vitest run` — each project gets its own `include`, `environment`, and `setupFiles`.
