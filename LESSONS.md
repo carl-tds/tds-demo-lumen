@@ -14,7 +14,16 @@
 
 ## Recent lessons (newest first)
 
-*No lessons yet — populate as agents complete tasks.*
+[2026-05-06] LD01a (orchestrator): Slack-driven autonomy v3.1 has no auto-detection of Slack replies — when DECISION NEEDED is posted and the chat session ends, the orchestrator does not resume on its own. Either set up the `loop` skill to poll, or expect the human to nudge the chat session. Document this gap in CLAUDE.md once a polling mechanism is chosen.
+[2026-05-06] LD01a (orchestrator): Always run `git status` in the worktree before dispatching builders — a prior session left uncommitted Prisma schema + deps that would have been duplicated by a fresh dispatch. Builders should pick up partial state, not redo it.
+[2026-05-06] LD01a (orchestrator): Prisma 7 + Neon needs `@prisma/adapter-pg` + `pg` wired into `lib/db.ts` at runtime — the Prisma client constructor throws without an adapter. Recurring pattern; consider promoting to CLAUDE.md once we've shipped a second Prisma-touching task.
+[2026-05-06] LD01a: React 19's eslint rule `react-hooks/set-state-in-effect` flags ANY setState() inside an effect body, not just synchronous-before-await ones. Move pre-fetch UI flips ("loading") into the input/event handler that triggers the dependency change, leave the effect to consume the response only.
+[2026-05-06] LD01a: Vitest 4 + globals:false + @testing-library/react 16 does NOT auto-register cleanup() between tests — DOM nodes from previous render() calls stack and getByRole reports duplicates from the prior test. Register `afterEach(cleanup)` in the setupFiles entry explicitly.
+[2026-05-06] LD01a: Vitest 4 supports a `projects: [...]` array on the root `test:` config so the same repo can run node-environment tests (API routes) and jsdom-environment tests (React components) in one `vitest run` — each project gets its own `include`, `environment`, and `setupFiles`.
+[2026-05-06] LD01a: Prisma 7 dropped `datasourceUrl`/`datasources` from `PrismaClientOptions` — `new PrismaClient()` at module top-level throws during `next build` page-data collection. Use a Proxy that constructs the client lazily on first property access; the singleton stays compatible with Next.js dev hot reload.
+[2026-05-06] LD01a: Vitest 4 + ESM-only `vitest-mock-extended` — top-level `const x = mockDeep()` runs AFTER `vi.mock` factory and breaks the mock. Use `await vi.hoisted(async () => { const { mockDeep } = await import('vitest-mock-extended'); return { x: mockDeep() } })` to construct the mock before any imports resolve. `vi.hoisted` with `require()` fails because vitest itself is ESM-only.
+[2026-05-06] LD01a: `prisma generate` reads `prisma.config.ts` which references `env("DATABASE_URL")` — `prisma generate` (and probably any prisma CLI cmd) refuses to run without it set. Pass a dummy when generating without a real DB: `DATABASE_URL=postgres://noop:noop@localhost:5432/noop npx prisma generate`.
+[2026-05-06] LD01a: `.gitignore` had `.env*` blanket-ignored — adding `.env.example` to the repo requires `!.env.example` exception, otherwise `git add` silently drops it.
 
 <!--
 Example entries (delete these once real ones exist):
