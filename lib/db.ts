@@ -1,16 +1,15 @@
 // Prisma client singleton with lazy instantiation.
 //
 // Prisma 7 requires a driver adapter to be supplied to the constructor at
-// runtime. We don't want to construct the client at module-evaluation time
-// because Next.js collects page data at build time, which loads all API
-// route modules — at that point DATABASE_URL may be a placeholder and we
-// have no real adapter wired in yet (the adapter is added in LD01b once
-// `@prisma/adapter-pg` is installed alongside Postmark/Slack work).
+// runtime. We construct lazily through a Proxy because Next.js collects
+// page data at build time (importing route modules), and at that point
+// DATABASE_URL is typically a placeholder. Construction happens on first
+// property access — i.e. inside an actual request handler at runtime.
 //
-// The lazy proxy below ensures the client is only constructed when a query
-// is actually executed (i.e. inside a request handler), and the singleton
-// pattern stops Next.js dev hot reloads from exhausting Postgres connections.
+// Tests bypass this module entirely via `vi.mock('@/lib/db', ...)`, so the
+// real adapter is never spun up under vitest.
 
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
 declare global {
@@ -21,20 +20,26 @@ let cached: PrismaClient | undefined = global.prismaGlobal;
 
 function getClient(): PrismaClient {
   if (cached) return cached;
-  // In Prisma 7, the adapter is the source of truth for the connection.
-  // For LD01a we construct without an adapter — this means Vercel/Neon will
-  // need the adapter wired in before the API can actually read/write.
-  // Tracking: TODO LD01b — install @prisma/adapter-pg + pg, wire it here.
-  cached = new PrismaClient();
+
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      "DATABASE_URL is not set. Required for Prisma client construction at request time.",
+    );
+  }
+
+  const adapter = new PrismaPg({ connectionString });
+  cached = new PrismaClient({ adapter });
+
   if (process.env.NODE_ENV !== "production") {
     global.prismaGlobal = cached;
   }
   return cached;
 }
 
-// A Proxy lets us return a stable export that defers construction until first
-// property access. Tests replace this whole module via vi.mock, so the proxy
-// is bypassed there.
+// A Proxy returns a stable export that defers construction until first
+// property access. Tests replace this whole module via vi.mock, so the
+// proxy is bypassed there.
 export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
   get(_target, prop) {
     const client = getClient();
