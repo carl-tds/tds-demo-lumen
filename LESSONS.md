@@ -14,7 +14,10 @@
 
 ## Recent lessons (newest first)
 
-*No lessons yet — populate as agents complete tasks.*
+[2026-05-06] LD01a: Prisma 7 dropped `datasourceUrl`/`datasources` from `PrismaClientOptions` — `new PrismaClient()` at module top-level throws during `next build` page-data collection. Use a Proxy that constructs the client lazily on first property access; the singleton stays compatible with Next.js dev hot reload.
+[2026-05-06] LD01a: Vitest 4 + ESM-only `vitest-mock-extended` — top-level `const x = mockDeep()` runs AFTER `vi.mock` factory and breaks the mock. Use `await vi.hoisted(async () => { const { mockDeep } = await import('vitest-mock-extended'); return { x: mockDeep() } })` to construct the mock before any imports resolve. `vi.hoisted` with `require()` fails because vitest itself is ESM-only.
+[2026-05-06] LD01a: `prisma generate` reads `prisma.config.ts` which references `env("DATABASE_URL")` — `prisma generate` (and probably any prisma CLI cmd) refuses to run without it set. Pass a dummy when generating without a real DB: `DATABASE_URL=postgres://noop:noop@localhost:5432/noop npx prisma generate`.
+[2026-05-06] LD01a: `.gitignore` had `.env*` blanket-ignored — adding `.env.example` to the repo requires `!.env.example` exception, otherwise `git add` silently drops it.
 
 <!--
 Example entries (delete these once real ones exist):
